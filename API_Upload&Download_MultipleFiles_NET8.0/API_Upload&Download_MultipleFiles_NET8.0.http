@@ -1,0 +1,6 @@
+@API_Upload_Download_MultipleFiles_NET8._0_HostAddress = http://localhost:5207
+
+GET {{API_Upload_Download_MultipleFiles_NET8._0_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
