@@ -1,4 +1,7 @@
 
+using API_Upload_Download_MultipleFiles_NET8._0.Services;
+using System.ComponentModel.DataAnnotations;
+
 namespace API_Upload_Download_MultipleFiles_NET8._0
 {
     public class Program
@@ -13,40 +16,78 @@ namespace API_Upload_Download_MultipleFiles_NET8._0
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
-
+            
+            builder.Services.AddTransient<IFileService, FileService>();
+            builder.Services.AddAntiforgery(options =>
+            {
+                // Configure Antiforgery options, if needed
+            });
             var app = builder.Build();
-
+         
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
-
-            app.UseHttpsRedirection();
-
+            // Add UseAntiforgery between UseAuthentication and UseEndpoints
+            app.UseAntiforgery();
+            
             app.UseAuthorization();
 
-            var summaries = new[]
+            /// <summary>
+            /// Uploads a file using IFormFile to a specified folder.
+            /// </summary>
+            /// <param name="formFile">The collection of files to upload.</param>
+            /// <param name="folderName">The name of the folder to store the uploaded files.</param>
+            /// <returns>An object containing information about the uploaded files.</returns>
+            app.MapPost("/upload", (IFileService fileService, [Required] IFormFile formFile, [Required] string folderName) =>
             {
-                "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-            };
+                try
+                {
+                    fileService.UploadUsingFormFile(formFile, folderName);
+                    var size = fileService.SizeConverter(formFile.Length);
+                    return Results.Ok(new { Size = size });
+                }
+                catch (Exception ex)
+                {
+                    return Results.BadRequest(ex.Message);
+                }
+            }).DisableAntiforgery();
 
-            app.MapGet("/weatherforecast", (HttpContext httpContext) =>
+            /// <summary>
+            /// Uploads a collection of files to a specified folder.
+            /// </summary>
+            /// <param name="formFiles">The collection of files to upload.</param>
+            /// <param name="folderName">The name of the folder to store the uploaded files.</param>
+            /// <returns>An object containing information about the uploaded files.</returns>
+            app.MapPost("/uploadMultipleFiles", async (IFileService fileService, IFormFileCollection formFiles, [Required] string folderName) =>
             {
-                var forecast = Enumerable.Range(1, 5).Select(index =>
-                    new WeatherForecast
-                    {
-                        Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                        TemperatureC = Random.Shared.Next(-20, 55),
-                        Summary = summaries[Random.Shared.Next(summaries.Length)]
-                    })
-                    .ToArray();
-                return forecast;
-            })
-            .WithName("GetWeatherForecast")
-            .WithOpenApi();
+                if (formFiles.Count == 0 || string.IsNullOrEmpty(folderName))
+                {
+                    return Results.BadRequest("Please provide files and a subdirectory.");
+                }
+                try
+                {
+                    fileService.UploadUsingFormFileCollection(formFiles, folderName);
+                    var size = fileService.SizeConverter(formFiles.Sum(f => f.Length));
+                    return Results.Ok(new { FileCount = formFiles.Count, Size = size });
+                }
+                catch (Exception)
+                {
+                    return Results.BadRequest("Issue in upload API");
+                }
+            }).DisableAntiforgery();
 
+            app.MapGet("/downloadFiles", (IFileService fileService, string folderName) =>
+            {
+                if (string.IsNullOrEmpty(folderName))
+                {
+                    return Results.BadRequest("Please provide folderName.");
+                }
+                var (fileType, archiveData, archiveName) = fileService.DownloadFiles(folderName);
+                return Results.File(archiveData, fileType, archiveName);
+            }).DisableAntiforgery();
             app.Run();
         }
     }
