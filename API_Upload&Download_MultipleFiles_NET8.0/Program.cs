@@ -78,7 +78,11 @@ namespace API_Upload_Download_MultipleFiles_NET8._0
                     return Results.BadRequest("Issue in upload API");
                 }
             }).DisableAntiforgery();
-
+            /// <summary>
+            /// Download a collection of files to a specified folder.
+            /// </summary>
+            /// <param name="folderName">The name of the folder to download files.</param>
+            /// <returns>Download the files from the folder.</returns>
             app.MapGet("/downloadFiles", (IFileService fileService, string folderName) =>
             {
                 if (string.IsNullOrEmpty(folderName))
